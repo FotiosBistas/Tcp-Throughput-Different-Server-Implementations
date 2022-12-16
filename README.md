@@ -2,7 +2,7 @@
 
 ## Maven commands
 
-To check if the project is a valid project:
+To check if the project is a valid maven project:
 
 `mvn validate`
 
