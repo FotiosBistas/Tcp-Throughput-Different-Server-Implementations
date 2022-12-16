@@ -57,10 +57,14 @@ To check if the project is a valid project:
 [INFO] ------------------------------------------------------------------------
 ```
 
-### With the manifest file
+### Run client with the manifest file
 
-`java -jar target/TCP_METRICS-1.0-SNAPSHOT.jar`
+The following command will run the client based on the manifest specified inside the `pom.xml`.
 
-### Without manifest file
+`java -jar target/TCP_METRICS-1.0-SNAPSHOT.jar serverA-ip serverB-ip number-of-files-A number-of-files-B`
 
-`java -cp targer/<jar-name>.jar StartClient`
+### Run client without manifest file
+
+The following command will run the client without needing a manifest `pom.xml`.
+
+`java -cp targer/<jar-name>.jar StartClient serverA-ip serverB-ip number-of-files-A number-of-files-B`
