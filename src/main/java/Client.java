@@ -3,6 +3,7 @@ import java.io.DataOutputStream;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 
 import org.json.JSONObject;
 
@@ -13,15 +14,20 @@ public class Client {
 
     private Socket clientSocket;
 
-    private String serverAAddress = null;
-    private String serverBAddress = null;
-    private int portA = 0;
-    private int portB = 0;
+    private String serverAddress = null;
+    private int port = 0;
 
-    private int filesNumberServerA = 0;
-    private int filesNumberServerB = 0;
-    private int latestFileReceived = 0;
+    private int filesNumberServer = 0;
+    private int stepsinFileRequest = 0;
 
+    private int nextfile = 1;
+
+    /**
+     * Prints a log with a timestamp to the left of it.
+     * 
+     * @param message the message that is going to be printed along with the
+     *                timestamp.
+     */
     private void log(String message) {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
         LocalDateTime now = LocalDateTime.now();
@@ -30,22 +36,29 @@ public class Client {
 
     public String toString() {
         return "\nClient with: \n"
-                + "server A address: " + serverAAddress + "\n"
-                + "server B address: " + serverBAddress + "\n"
-                + "request analogy " + filesNumberServerA + " from server A \n"
-                + "request analogy " + filesNumberServerB + " from server B \n"
-                + "server A port: " + portA + "\n"
-                + "server B port: " + portB + "\n";
+                + "server address: " + serverAddress + "\n"
+                + "request analogy " + filesNumberServer + " from server: " + serverAddress + "\n"
+                + "server port: " + port + "\n"
+                + "steps in file request: " + stepsinFileRequest;
     }
 
-    private void createRequest(String serverIP, int port, int filenumber) {
+    /**
+     * This function must be called each time after the client has received the
+     * requested file/files. Creates a new JSON object which is a request object and
+     * sends it to the server.
+     * 
+     * @param serverIP    the server we will connect to
+     * @param port        the port that the server listens to
+     * @param filenumbers the file numbers we want to generate filenames for.
+     */
+    private void createRequest(String serverIP, int port, int[] filenumbers) {
         log("Creating new request");
 
         JSONObject nJsonObject = new JSONObject();
-        String fileRequest = null;
+        String[] fileRequests = null;
 
         try {
-            fileRequest = createFileNameFromNumber(filesNumberServerA);
+            fileRequests = createFileNameFromNumber(filenumbers);
         } catch (Throwable e) {
             log("Error while trying to create filename: " + e);
             return;
@@ -53,37 +66,68 @@ public class Client {
 
         nJsonObject.put("ServerIP", serverIP);
         nJsonObject.put("ServerPort", port);
-        nJsonObject.put("Filename", fileRequest);
+        nJsonObject.put("Filenames", fileRequest);
 
         log("Created new JSON object: " + nJsonObject);
     }
 
-    private String createFileNameFromNumber(int number) {
-        String formatted = null;
+    /**
+     * Creates a new file name of the following format:
+     * sXXX where XXX starts from 001 and goes up to 160.
+     * 
+     * @param number the number of the file we want to request next
+     * @return The formated file names or an error if an error occured.
+     */
+    private String[] createFileNameFromNumber(int[] number) {
+        String[] files = Arrays.stream(number)
+                .mapToObj((num) -> {
+                    if (num < 1 || num > 160) {
+                        return "Out of range number was given";
+                    }
 
-        if (number < 1 || number > 999) {
-            throw new Error("Out of range number was given");
-        }
+                    String formatted = String.format("%03d", num);
 
-        formatted = String.format("%03d", number);
+                    if (formatted == null) {
+                        return "Formated file number remained null after string format";
+                    }
 
-        if (formatted == null) {
-            throw new Error("Formated file number remained null after string format");
-        }
-
-        return "s" + formatted;
+                    return "s" + formatted;
+                }).toArray(String[]::new);
+        return files;
     }
 
-    public Client(String serverAAddress, String serverBAddress, int filesNumberServerA, int filesNumberServerB,
-            int portA, int portB) {
+    // TODO create a method that handles an array
 
-        this.serverAAddress = serverAAddress;
-        this.serverBAddress = serverBAddress;
-        this.filesNumberServerA = filesNumberServerA;
-        this.filesNumberServerB = filesNumberServerB;
-        this.portA = portA;
-        this.portB = portB;
+    public Client(String serverAddress, int filesNumberServer,
+            int port, int stepsinFileRequest) {
+
+        this.serverAddress = serverAddress;
+        this.filesNumberServer = filesNumberServer;
+        this.port = port;
+        this.stepsinFileRequest = stepsinFileRequest;
 
         log(this.toString());
+    }
+
+    /**
+     * Adds the step into the next file to request the next file from the
+     * corresponding server.
+     */
+    private void addStep(int step) {
+        this.nextfile += step;
+    }
+
+    /**
+     * Starts requesting the files from the server. It should stop when the server
+     * sends some type of done message
+     */
+    public void StartRequesting() {
+        try {
+            clientSocket = new Socket(serverAddress, port);
+            dataInputStream = new DataInputStream(clientSocket.getInputStream());
+            dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+        } catch (Exception e) {
+            log("Expection while trying to create socket: " + e);
+        }
     }
 }
