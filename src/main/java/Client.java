@@ -4,16 +4,14 @@ import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.IntStream;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Client {
-
-    private static DataOutputStream dataOutputStream = null;
-    private static DataInputStream dataInputStream = null;
-
-    private Socket clientSocket;
 
     private String serverAddress = null;
     private int port = 0;
@@ -25,6 +23,8 @@ public class Client {
     private int stepsinFileRequest = 0;
     // the next file we are expecting.
     private int nextfile = 1;
+
+    ThreadPoolExecutor executor;
 
     /**
      * Prints a log with a timestamp to the left of it.
@@ -54,25 +54,21 @@ public class Client {
      * @param serverIP    the server we will connect to
      * @param port        the port that the server listens to
      * @param filenumbers the file numbers we want to generate filenames for.
+     * @return returns the JSON object created.
      */
-    private void createRequest(String serverIP, int port, int[] filenumbers) {
+    private JSONObject createRequestObject(String serverIP, int port, int[] filenumbers) {
         log("Creating new request");
 
         JSONObject nJsonObject = new JSONObject();
-        String[] fileRequests = null;
-
-        try {
-            fileRequests = createFileNameFromNumber(filenumbers);
-        } catch (Throwable e) {
-            log("Error while trying to create filename: " + e);
-            return;
-        }
+        String[] fileRequests = createFileNameFromNumber(filenumbers);
 
         nJsonObject.put("ServerIP", serverIP);
         nJsonObject.put("ServerPort", port);
         nJsonObject.put("Filenames", fileRequests);
 
         log("Created new JSON object: " + nJsonObject);
+
+        return nJsonObject;
     }
 
     /**
@@ -85,8 +81,10 @@ public class Client {
     private String[] createFileNameFromNumber(int[] number) {
         String[] files = Arrays.stream(number)
                 .mapToObj((num) -> {
+
                     if (num < 1 || num > 160) {
-                        return "Out of range number was given";
+
+                        return "Out of range number was given or there aren't any more files";
                     }
 
                     String formatted = String.format("%03d", num);
@@ -109,7 +107,7 @@ public class Client {
         this.filesNumberServer = filesNumberServer;
         this.port = port;
         this.stepsinFileRequest = stepsinFileRequest;
-
+        this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
         log(this.toString());
     }
 
@@ -136,24 +134,57 @@ public class Client {
     }
 
     /**
-     * Starts requesting the files from the server. It should stop when the server
-     * sends some type of done message
+     * Starts requesting the files from the server. It stops when client reaches the
+     * end of the requests.
      */
     public void StartRequesting() {
-        // example nextfile = 1 , and filesNumberServer = 3 should return the array
-        // {1,2,3}
-        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
-        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
-        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
-        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
+        // breaks with an if inside
+        while (true) {
+            JSONObject requestJSON = createRequestObject(serverAddress, port,
+                    createNumberArray(nextfile, nextfile + filesNumberServer - 1));
 
-        try {
-            clientSocket = new Socket(serverAddress, port);
-            dataInputStream = new DataInputStream(clientSocket.getInputStream());
-            dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-        } catch (Exception e) {
-            log("Expection while trying to create socket: " + e);
+            Request request = new Request(requestJSON);
+
+            if (request.jsonObject == null) {
+                continue;
+            }
+
+            Thread thread = new Thread(request);
+            executor.submit(thread);
+
+            // essentially the "Out of range number was given or there aren't any more
+            // files" acts as a done in the requests
+            String[] array = (String[]) requestJSON.get("Filenames");
+            if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
+                break;
+            }
+
         }
 
+    }
+
+    private class Request implements Runnable {
+        private DataOutputStream dataOutputStream = null;
+        private DataInputStream dataInputStream = null;
+        private JSONObject jsonObject;
+        private Socket clientSocket;
+
+        Request(JSONObject jsonObject) {
+            try {
+                clientSocket = new Socket(serverAddress, port);
+                dataInputStream = new DataInputStream(clientSocket.getInputStream());
+                dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+                this.jsonObject = jsonObject;
+            } catch (Exception e) {
+                log("Expection while trying to create socket: " + e);
+            }
+        }
+
+        @Override
+        public void run() {
+            log("Started new thread");
+            // TODO Auto-generated method stub
+
+        }
     }
 }
