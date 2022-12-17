@@ -18,7 +18,8 @@
 *.zip
 *.tar.gz
 *.rar
-.target
+
+target/
 # ignore vs code config 
 .vscode
 
