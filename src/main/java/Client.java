@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import org.json.JSONObject;
 
@@ -17,9 +18,12 @@ public class Client {
     private String serverAddress = null;
     private int port = 0;
 
+    // files to request from the server
     private int filesNumberServer = 0;
+    // step to take when changing the file range. This is essentially what the other
+    // client will ask.
     private int stepsinFileRequest = 0;
-
+    // the next file we are expecting.
     private int nextfile = 1;
 
     /**
@@ -66,7 +70,7 @@ public class Client {
 
         nJsonObject.put("ServerIP", serverIP);
         nJsonObject.put("ServerPort", port);
-        nJsonObject.put("Filenames", fileRequest);
+        nJsonObject.put("Filenames", fileRequests);
 
         log("Created new JSON object: " + nJsonObject);
     }
@@ -114,7 +118,21 @@ public class Client {
      * corresponding server.
      */
     private void addStep(int step) {
-        this.nextfile += step;
+        this.nextfile += step + 1;
+    }
+
+    /**
+     * Creates a new number number array inside the range.
+     * 
+     * @param start the start of the number array.
+     * @param to    the end of the number array.
+     * @return Returns the number array created.
+     */
+    private int[] createNumberArray(int start, int to) {
+        int[] numberArray = IntStream.rangeClosed(start, to).toArray();
+        nextfile = to;
+        addStep(stepsinFileRequest);
+        return numberArray;
     }
 
     /**
@@ -122,6 +140,13 @@ public class Client {
      * sends some type of done message
      */
     public void StartRequesting() {
+        // example nextfile = 1 , and filesNumberServer = 3 should return the array
+        // {1,2,3}
+        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
+        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
+        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
+        log(Arrays.toString(createNumberArray(nextfile, nextfile + filesNumberServer - 1)));
+
         try {
             clientSocket = new Socket(serverAddress, port);
             dataInputStream = new DataInputStream(clientSocket.getInputStream());
@@ -129,5 +154,6 @@ public class Client {
         } catch (Exception e) {
             log("Expection while trying to create socket: " + e);
         }
+
     }
 }
