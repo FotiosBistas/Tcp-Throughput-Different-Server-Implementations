@@ -1,11 +1,22 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.spec.ECField;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.stream.IntStream;
 
 import org.json.JSONArray;
@@ -13,16 +24,28 @@ import org.json.JSONObject;
 
 public class Client {
 
-    private String serverAddress = null;
-    private int port = 0;
+    private ObjectOutputStream objectAOutputStream = null;
+    private ObjectInputStream objectAInputStream = null;
+    private ObjectOutputStream objectBOutputStream = null;
+    private ObjectInputStream objectBInputStream = null;
+    private Socket clientASocket;
+    private Socket clientBSocket;
 
-    // files to request from the server
-    private int filesNumberServer = 0;
+    private String serverAAddress = "";
+    private String serverBAddress = "";
+
+    private int portA = 0;
+    private int portB = 0;
+
+    // files to request from A server
+    private int filesANumberServer = 0;
+    // files to request from B server
+    private int filesBNumberServer = 0;
     // step to take when changing the file range. This is essentially what the other
     // client will ask.
-    private int stepsinFileRequest = 0;
     // the next file we are expecting.
-    private int nextfile = 1;
+    private volatile int nextAfile = 1;
+    private volatile int nextBfile = 1;
 
     ThreadPoolExecutor executor;
 
@@ -40,10 +63,14 @@ public class Client {
 
     public String toString() {
         return "\nClient with: \n"
-                + "server address: " + serverAddress + "\n"
-                + "request analogy " + filesNumberServer + " from server: " + serverAddress + "\n"
-                + "server port: " + port + "\n"
-                + "steps in file request: " + stepsinFileRequest;
+                + "server A address: " + serverAAddress + "\n"
+                + "server B address: " + serverAAddress + "\n"
+                + "request analogy A " + filesANumberServer + "\n"
+                + "request analogy B " + filesBNumberServer + "\n"
+                + "server A port: " + portA + "\n"
+                + "server B port: " + portB + "\n"
+                + "next file expected from A initialization: " + nextAfile + "\n"
+                + "next file expected from B initialization: " + nextBfile + "\n";
     }
 
     /**
@@ -98,16 +125,38 @@ public class Client {
         return files;
     }
 
-    // TODO create a method that handles an array
+    public Client(String serverAAddress, String serverBAddress, int portA, int portB, int filesANumberServer,
+            int filesBNumberServer) {
 
-    public Client(String serverAddress, int filesNumberServer,
-            int port, int stepsinFileRequest) {
+        /*
+         * try {
+         * clientASocket = new Socket(serverAAddress, portA);
+         * clientBSocket = new Socket(serverBAddress, portB);
+         * objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
+         * objectAOutputStream = new
+         * ObjectOutputStream(clientASocket.getOutputStream());
+         * objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
+         * objectBOutputStream = new
+         * ObjectOutputStream(clientBSocket.getOutputStream());
+         * } catch (Exception e) {
+         * log("Exception occured while trying to create client: " + e);
+         * return;
+         * }
+         */
 
-        this.serverAddress = serverAddress;
-        this.filesNumberServer = filesNumberServer;
-        this.port = port;
-        this.stepsinFileRequest = stepsinFileRequest;
+        this.serverAAddress = serverAAddress;
+        this.serverBAddress = serverBAddress;
+
+        this.portA = portA;
+        this.portB = portB;
+
+        this.filesANumberServer = filesANumberServer;
+        this.filesBNumberServer = filesBNumberServer;
+
+        this.nextBfile = filesANumberServer + 1;
+
         this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
+
         log(this.toString());
     }
 
@@ -115,8 +164,18 @@ public class Client {
      * Adds the step into the next file to request the next file from the
      * corresponding server.
      */
-    private void addStep(int step) {
-        this.nextfile += step + 1;
+    private void addAStep(int step) {
+        this.nextAfile += step + 1;
+        log("Next file to be expected from A: " + nextAfile);
+    }
+
+    /**
+     * Adds the step into the next file to request the next file from the
+     * corresponding server.
+     */
+    private void addBStep(int step) {
+        this.nextBfile += step + 1;
+        log("Next file to be expected from B: " + nextBfile);
     }
 
     /**
@@ -126,65 +185,137 @@ public class Client {
      * @param to    the end of the number array.
      * @return Returns the number array created.
      */
-    private int[] createNumberArray(int start, int to) {
+    private synchronized int[] createNumberArray(int start, int to, String aSteporBStep) {
         int[] numberArray = IntStream.rangeClosed(start, to).toArray();
-        nextfile = to;
-        addStep(stepsinFileRequest);
+        if (aSteporBStep.equals("A")) {
+            nextAfile = to;
+            addAStep(filesBNumberServer);
+        } else {
+            nextBfile = to;
+            addBStep(filesANumberServer);
+        }
         return numberArray;
     }
 
     /**
-     * Starts requesting the files from the server. It stops when client reaches the
-     * end of the requests.
+     * Call the function to create a new JSON object which is the request. It also
+     * tweaks the necessary variables so the clients can ask for the next set of
+     * files from the server.
+     * 
+     * @param serverAddress     The server address we are creating the request for.
+     * @param port              The port of the server.
+     * @param nextfile          The next file we are awaiting.
+     * @param filesNumberServer The number of files we ask in each request.
+     * @param aSteporBStep      Choose what client variables we modify. These
+     *                          differentiate from A and B.
+     * @return returns the JSON object.
      */
-    public void StartRequesting() {
-        // breaks with an if inside
-        while (true) {
-            JSONObject requestJSON = createRequestObject(serverAddress, port,
-                    createNumberArray(nextfile, nextfile + filesNumberServer - 1));
+    private JSONObject createRequest(String serverAddress, int port, int nextfile, int filesNumberServer,
+            String aSteporBStep) {
 
-            Request request = new Request(requestJSON);
+        JSONObject requestforJSON = createRequestObject(serverAddress, port,
+                createNumberArray(nextfile, nextfile + filesNumberServer - 1, aSteporBStep));
+        log("Created new request for server A");
 
-            if (request.jsonObject == null) {
-                continue;
-            }
-
-            Thread thread = new Thread(request);
-            executor.submit(thread);
-
-            // essentially the "Out of range number was given or there aren't any more
-            // files" acts as a done in the requests
-            String[] array = (String[]) requestJSON.get("Filenames");
-            if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
-                break;
-            }
-
-        }
+        return requestforJSON;
 
     }
 
-    private class Request implements Runnable {
-        private DataOutputStream dataOutputStream = null;
-        private DataInputStream dataInputStream = null;
-        private JSONObject jsonObject;
-        private Socket clientSocket;
+    /**
+     * Starts requesting both servers for the files. It does this by creating two
+     * callable tasks which are then called using invokeAll() to wait for their
+     * completion. Inside these two tasks the time it takes for each request to
+     * complete is counted in nanoseconds. After that using the get() method for
+     * each Future<Object> we get the ArrayList<Long> of each request. Then to
+     * return it we add the array list to another List.
+     * 
+     * @return returns the array of nanoseconds it took for each request
+     */
+    public ArrayList<ArrayList<Long>> StartRequesting() {
 
-        Request(JSONObject jsonObject) {
-            try {
-                clientSocket = new Socket(serverAddress, port);
-                dataInputStream = new DataInputStream(clientSocket.getInputStream());
-                dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
-                this.jsonObject = jsonObject;
-            } catch (Exception e) {
-                log("Expection while trying to create socket: " + e);
+        Callable<Object> task1 = new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                log("Starting to request from server A");
+                // breaks with an if inside
+                ArrayList<Long> requestTimes = new ArrayList<>();
+                while (true) {
+                    long startTime = System.nanoTime(); // get the start time in nanoseconds
+                    JSONObject requestforJSON = createRequest(serverAAddress, portA, nextAfile, filesANumberServer,
+                            "A");
+
+                    // TODO SOCKET HANDLING
+                    long endTime = System.nanoTime(); // get the end time in nanoseconds
+                    long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
+                    log("It took: " + elapsedTime + " nanoseconds to complete the request");
+                    requestTimes.add(elapsedTime);
+
+                    // essentially the "Out of range number was given or there aren't any more
+                    // files" acts as a done in the requests
+                    // execute the code that you want to measure the time for
+                    String[] array = (String[]) requestforJSON.get("Filenames");
+                    if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
+                        log("Breaking from for A loop");
+                        break;
+                    }
+
+                }
+                log("Finished requesting from server A");
+                return requestTimes;
             }
+        };
+
+        Callable<Object> task2 = new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                log("Starting to request from server B");
+                ArrayList<Long> requestTimes = new ArrayList<>();
+                while (true) {
+                    long startTime = System.nanoTime(); // get the start time in nanoseconds
+
+                    JSONObject requestforJSON = createRequest(serverBAddress, portB, nextBfile, filesBNumberServer,
+                            "B");
+
+                    // TODO SOCKET HANDLING
+                    long endTime = System.nanoTime(); // get the end time in nanoseconds
+                    long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
+                    log("It took: " + elapsedTime + " nanoseconds to complete the request");
+                    requestTimes.add(elapsedTime);
+
+                    // essentially the "Out of range number was given or there aren't any more
+                    // files" acts as a done in the requests
+                    // execute the code that you want to measure the time for
+                    String[] array = (String[]) requestforJSON.get("Filenames");
+                    if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
+                        log("Breaking from B for loop");
+                        break;
+                    }
+
+                }
+                log("Finished requesting from server B");
+                return requestTimes;
+            }
+        };
+
+        // Create a list of tasks
+        List<Callable<Object>> tasks = Arrays.asList(task1, task2);
+        ArrayList<ArrayList<Long>> metrics = new ArrayList<ArrayList<Long>>();
+
+        try {
+            List<Future<Object>> results = executor.invokeAll(tasks);
+            for (Future<Object> result : results) {
+                ArrayList<Long> value = (ArrayList<Long>) result.get(); // get the result of the task
+                metrics.add(value);
+            }
+            log("Finished requests");
+        } catch (InterruptedException e) {
+            log("Error while waiting for threads to finish and getting results: " + e);
+        } catch (ExecutionException e) {
+            log("Error while waiting for threads to finish and getting results " + e);
         }
 
-        @Override
-        public void run() {
-            log("Started new thread");
-            // TODO Auto-generated method stub
+        executor.shutdown();
 
-        }
+        return metrics;
     }
 }
