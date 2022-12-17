@@ -20,9 +20,13 @@ To check if the project is a valid maven project:
 [INFO] ------------------------------------------------------------------------
 ```
 
-## Build the jar file
+## Build the jar file with the dependencies installed
 
-`mvn package`
+`mvn install`
+
+Or cleaning the target directory first:
+
+`mvn clean install -U`
 
 ```
 [INFO] Scanning for projects...
@@ -56,6 +60,13 @@ To check if the project is a valid maven project:
 [INFO] Finished at: 2022-12-16T17:06:00+02:00
 [INFO] ------------------------------------------------------------------------
 ```
+
+This will create two jar files:
+
+- original-TCP_METRICS-1.0-SNAPSHOT.jar
+- TCP_METRICS-1.0-SNAPSHOT.jar
+
+The one without the original is the one with the dependencies.
 
 ### Run client with the manifest file
 
