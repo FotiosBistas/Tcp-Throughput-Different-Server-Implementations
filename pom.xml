@@ -32,7 +32,7 @@
                 <version>1.6.0</version>
                 <executions>
                     <execution>
-                    <id>update-submodule</id>
+                    <id>update-submodules</id>
                     <phase>initialize</phase>
                     <goals>
                         <goal>exec</goal>
@@ -41,9 +41,11 @@
                         <executable>git</executable>
                         <arguments>
                         <argument>submodule</argument>
-                        <argument>update</argument>
-                        <argument>--init</argument>
-                        <argument>--recursive</argument>
+                        <argument>foreach</argument>
+                        <argument>git</argument>
+                        <argument>pull</argument>
+                        <argument>origin</argument>
+                        <argument>main</argument>
                         </arguments>
                     </configuration>
                     </execution>
