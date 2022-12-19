@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <parent>
+    <artifactId>TCP_METRICS</artifactId>
+    <groupId>gr.AUEB</groupId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>gr.AUEB</groupId>
-  <artifactId>TCP_METRICS</artifactId>
-  <name>My Project</name>
+  <artifactId>CLIENT_TCP_METRICS</artifactId>
+  <name>Client Side</name>
   <version>1.0-SNAPSHOT</version>
   <url>http://maven.apache.org</url>
   <build>
-    <sourceDirectory>src/main/java</sourceDirectory>
+    <sourceDirectory>main/java</sourceDirectory>
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -49,8 +54,4 @@
       </plugin>
     </plugins>
   </build>
-  <properties>
-    <json.version>20220924</json.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
 </project>
