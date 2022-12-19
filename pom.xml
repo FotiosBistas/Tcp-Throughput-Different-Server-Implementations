@@ -27,6 +27,29 @@
         <sourceDirectory>src/main/java</sourceDirectory>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <executions>
+                    <execution>
+                    <id>update-submodule</id>
+                    <phase>initialize</phase>
+                    <goals>
+                        <goal>exec</goal>
+                    </goals>
+                    <configuration>
+                        <executable>git</executable>
+                        <arguments>
+                        <argument>submodule</argument>
+                        <argument>update</argument>
+                        <argument>--init</argument>
+                        <argument>--recursive</argument>
+                        </arguments>
+                    </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
