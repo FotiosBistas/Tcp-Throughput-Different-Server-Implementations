@@ -1,16 +1,33 @@
 
 import java.io.*;
 import java.net.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class Server {
 
     // Path to the files
-    private String file_path = "\\files\\";
+    private String file_path = ".\\files\\";
 
     private String ip;
     private int servicePort;
     private ServerSocket serverSocket;
-    private Socket clientConnection;
+
+    ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(4);;
+
+    /**
+     * Prints a log with a timestamp to the left of it.
+     * 
+     * @param message the message that is going to be printed along with the
+     *                timestamp.
+     */
+    private void log(String message) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
+        System.out.println(dtf.format(now) + " " + message);
+    }
 
     // Constructor with specified path to the files
     public Server(String ip, int servicePort) {
@@ -24,29 +41,29 @@ public class Server {
         // requests
         try {
             this.serverSocket = new ServerSocket(this.servicePort);
-            System.out.println("listening for requests at port " + this.servicePort + "...");
+            log("listening for requests at port " + this.servicePort + "...");
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("Error setting up the main.java.Server.");
+            log("Error setting up the main.java.Server.");
         }
 
         // Loop that accepts connections and creates a thread to
         // TODO: may end up making an implementation with threads.
         try {
             while (!serverSocket.isClosed()) {
-                clientConnection = serverSocket.accept();
-                /*
-                 * TODO: Here we can do one of the two:
-                 * 1) Create a handler Thread that takes care of the requests,
-                 * 2) The server switches from accepting connections to handling requests
-                 * from the established connection.
-                 * (note) The later is simpler, and since we only ever accept one connection,
-                 * handler threads are not really necessary. It may be a better practice though.
-                 */
+                Socket clientConnection = serverSocket.accept();
+                log("Received new connection from: " + clientConnection.getInetAddress() + " at port: "
+                        + this.servicePort);
+                ObjectInputStream objectInputStream = new ObjectInputStream(clientConnection.getInputStream());
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(clientConnection.getOutputStream());
+                RequestHandler requestHandler = new RequestHandler(clientConnection, objectInputStream,
+                        objectOutputStream);
+                Thread newThread = new Thread(requestHandler);
+                this.executor.execute(newThread);
             }
         } catch (IOException e) {
             e.printStackTrace();
-            System.err.println("Error trying to accept a connection.");
+            log("Error trying to accept a connection.");
             // Close the server socket.
             shutdown();
         }
@@ -56,10 +73,11 @@ public class Server {
         try {
             if (!serverSocket.isClosed()) {
                 serverSocket.close();
+                log("Successfully shutdown server");
             }
         } catch (IOException e) {
             e.printStackTrace();
-            System.err.println("Error closing the server Socket.");
+            log("Error closing the server Socket.");
         }
     }
 

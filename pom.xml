@@ -27,7 +27,8 @@
                 <artifactId>json</artifactId>
                 <version>${json.version}</version>
             </dependency>  
-    </dependencies>
+            
+        </dependencies>
     </dependencyManagement>
     
     <build>

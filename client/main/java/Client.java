@@ -18,7 +18,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.IntStream;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -37,6 +36,8 @@ public class Client {
     private int portA = 0;
     private int portB = 0;
 
+    ArrayList<ArrayList<Long>> metrics = new ArrayList<>();
+
     // files to request from A server
     private int filesANumberServer = 0;
     // files to request from B server
@@ -47,7 +48,7 @@ public class Client {
     private volatile int nextAfile = 1;
     private volatile int nextBfile = 1;
 
-    ThreadPoolExecutor executor;
+    ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
 
     /**
      * Prints a log with a timestamp to the left of it.
@@ -128,22 +129,6 @@ public class Client {
     public Client(String serverAAddress, String serverBAddress, int portA, int portB, int filesANumberServer,
             int filesBNumberServer) {
 
-        /*
-         * try {
-         * clientASocket = new Socket(serverAAddress, portA);
-         * clientBSocket = new Socket(serverBAddress, portB);
-         * objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
-         * objectAOutputStream = new
-         * ObjectOutputStream(clientASocket.getOutputStream());
-         * objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
-         * objectBOutputStream = new
-         * ObjectOutputStream(clientBSocket.getOutputStream());
-         * } catch (Exception e) {
-         * log("Exception occured while trying to create client: " + e);
-         * return;
-         * }
-         */
-
         this.serverAAddress = serverAAddress;
         this.serverBAddress = serverBAddress;
 
@@ -154,10 +139,21 @@ public class Client {
         this.filesBNumberServer = filesBNumberServer;
 
         this.nextBfile = filesANumberServer + 1;
-
-        this.executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
-
         log(this.toString());
+
+        try {
+            clientASocket = new Socket(serverAAddress, portA);
+            clientBSocket = new Socket(serverBAddress, portB);
+            objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
+            objectAOutputStream = new ObjectOutputStream(clientASocket.getOutputStream());
+            objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
+            objectBOutputStream = new ObjectOutputStream(clientBSocket.getOutputStream());
+        } catch (Exception e) {
+            log("Exception occured while trying to create client: " + e);
+            return;
+        }
+        log("Succesfully connected to server");
+
     }
 
     /**
@@ -166,7 +162,7 @@ public class Client {
      */
     private void addAStep(int step) {
         this.nextAfile += step + 1;
-        log("Next file to be expected from A: " + nextAfile);
+        log("Step was: " + step + " and next file to be expected from B: " + nextAfile);
     }
 
     /**
@@ -175,7 +171,7 @@ public class Client {
      */
     private void addBStep(int step) {
         this.nextBfile += step + 1;
-        log("Next file to be expected from B: " + nextBfile);
+        log("Step was: " + step + " and next file to be expected from B: " + nextBfile);
     }
 
     /**
@@ -187,6 +183,7 @@ public class Client {
      */
     private synchronized int[] createNumberArray(int start, int to, String aSteporBStep) {
         int[] numberArray = IntStream.rangeClosed(start, to).toArray();
+        log("Creating number array... File number A: " + filesANumberServer + " File Number B: " + filesBNumberServer);
         if (aSteporBStep.equals("A")) {
             nextAfile = to;
             addAStep(filesBNumberServer);
@@ -215,7 +212,7 @@ public class Client {
 
         JSONObject requestforJSON = createRequestObject(serverAddress, port,
                 createNumberArray(nextfile, nextfile + filesNumberServer - 1, aSteporBStep));
-        log("Created new request for server A");
+        log("Created new request for server: " + aSteporBStep);
 
         return requestforJSON;
 
@@ -244,7 +241,7 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverAAddress, portA, nextAfile, filesANumberServer,
                             "A");
 
-                    // TODO SOCKET HANDLING
+                    objectAOutputStream.writeObject(requestforJSON);
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
@@ -276,7 +273,7 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverBAddress, portB, nextBfile, filesBNumberServer,
                             "B");
 
-                    // TODO SOCKET HANDLING
+                    objectBOutputStream.writeObject(requestforJSON);
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");

@@ -3,11 +3,11 @@ import java.util.List;
 
 public class StartClient {
 
-    private Long nanoSecondsToSeconds(Long nanoseconds) {
+    private static Long nanoSecondsToSeconds(Long nanoseconds) {
         return nanoseconds / 1000000000;
     }
 
-    private Long nanoSecondsToMilliSeconds(Long nanoseconds) {
+    private static Long nanoSecondsToMilliSeconds(Long nanoseconds) {
         return nanoseconds / 1000000;
     }
 
