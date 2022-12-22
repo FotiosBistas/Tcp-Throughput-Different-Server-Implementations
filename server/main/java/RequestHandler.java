@@ -44,6 +44,13 @@ public class RequestHandler implements Runnable {
         log("Created new request handler");
     }
 
+    /**
+     * Filenames are received in the form: String(["s001.ms", "s002.ms"]).
+     * Removes the commas the brackets and the quotes from the string.
+     * 
+     * @param filenames
+     * @return
+     */
     private String[] parseToStringArray(String filenames) {
         filenames = filenames.replace("[", "");
         filenames = filenames.replace("]", "");
@@ -65,7 +72,10 @@ public class RequestHandler implements Runnable {
                     .forEach(filename -> {
                         String file = filename + this.file_extension;
                         try {
-                            fileInputStream = new FileInputStream(".../files/" + file);
+                            fileInputStream = new FileInputStream(
+                                    "..\\files\\"
+                                            + file);
+
                         } catch (Exception e) {
                             log("Exception: " + e + " occured while reading file: " + file);
                         }
