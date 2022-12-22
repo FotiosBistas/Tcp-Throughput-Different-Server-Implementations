@@ -4,7 +4,9 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -16,7 +18,7 @@ public class RequestHandler implements Runnable {
     ObjectOutputStream objectOutputStream = null;
     FileInputStream fileInputStream = null;
 
-    private final String file_extension = "m4s";
+    private final String file_extension = ".m4s";
 
     /**
      * Prints a log with a timestamp to the left of it.
@@ -42,19 +44,28 @@ public class RequestHandler implements Runnable {
         log("Created new request handler");
     }
 
+    private String[] parseToStringArray(String filenames) {
+        filenames = filenames.replace("[", "");
+        filenames = filenames.replace("]", "");
+        filenames = filenames.replace("\"", "");
+        log("Turned received json array to: " + filenames);
+        return filenames.split(",");
+    }
+
     @Override
     public void run() {
         log("Handling connection from: " + this.connection.getInetAddress());
         try {
             String string_json = (String) objectInputStream.readObject();
             JSONObject json = new JSONObject(string_json);
-            JSONArray[] filenames = (JSONArray[]) json.get("Filenames");
+            JSONArray filenames = ((JSONArray) json.get("Filenames"));
+            String[] workable = parseToStringArray(filenames.toString());
 
-            Arrays.stream(filenames)
+            Arrays.stream(workable)
                     .forEach(filename -> {
                         String file = filename + this.file_extension;
                         try {
-                            fileInputStream = new FileInputStream("./files" + file);
+                            fileInputStream = new FileInputStream(".../files/" + file);
                         } catch (Exception e) {
                             log("Exception: " + e + " occured while reading file: " + file);
                         }
