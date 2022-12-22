@@ -54,12 +54,11 @@ public class Server {
                 Socket clientConnection = serverSocket.accept();
                 log("Received new connection from: " + clientConnection.getInetAddress() + " at port: "
                         + this.servicePort);
-                ObjectInputStream objectInputStream = new ObjectInputStream(clientConnection.getInputStream());
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(clientConnection.getOutputStream());
-                RequestHandler requestHandler = new RequestHandler(clientConnection, objectInputStream,
-                        objectOutputStream);
+
+                RequestHandler requestHandler = new RequestHandler(clientConnection);
+
                 Thread newThread = new Thread(requestHandler);
-                this.executor.execute(newThread);
+                newThread.start();
             }
         } catch (IOException e) {
             e.printStackTrace();

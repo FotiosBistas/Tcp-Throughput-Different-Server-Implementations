@@ -144,10 +144,10 @@ public class Client {
         try {
             clientASocket = new Socket(serverAAddress, portA);
             clientBSocket = new Socket(serverBAddress, portB);
-            objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
             objectAOutputStream = new ObjectOutputStream(clientASocket.getOutputStream());
-            objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
+            objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
             objectBOutputStream = new ObjectOutputStream(clientBSocket.getOutputStream());
+            objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
         } catch (Exception e) {
             log("Exception occured while trying to create client: " + e);
             return;
@@ -241,7 +241,7 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverAAddress, portA, nextAfile, filesANumberServer,
                             "A");
 
-                    objectAOutputStream.writeObject(requestforJSON);
+                    objectAOutputStream.writeObject(requestforJSON.toString());
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
@@ -273,7 +273,7 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverBAddress, portB, nextBfile, filesBNumberServer,
                             "B");
 
-                    objectBOutputStream.writeObject(requestforJSON);
+                    objectBOutputStream.writeObject(requestforJSON.toString());
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
