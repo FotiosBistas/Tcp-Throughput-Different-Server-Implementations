@@ -65,6 +65,9 @@ public class RequestHandler implements Runnable {
         filenames = filenames.replace("Out of range number was given or there aren't any more files", "");
         filenames = filenames.replace("Formated file number remained null after string format", "");
         log("Turned received json array to: " + filenames);
+        if(filenames.equals("")){
+            return new String[0];
+        }
         return filenames.split(",");
     }
 
@@ -86,7 +89,7 @@ public class RequestHandler implements Runnable {
                 this.dataOutputStream.writeInt(workable.length);
                 Arrays.stream(workable)
                         .forEach(filename -> {
-                            String path = "..\\files\\" + filename + this.file_extension;
+                            String path = "files/" + filename + this.file_extension;
                             sendFile(path);
                         });
                 log("Finished sending files to the client");
