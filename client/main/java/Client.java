@@ -70,7 +70,7 @@ public class Client {
     public String toString() {
         return "\nClient with: \n"
                 + "server A address: " + serverAAddress + "\n"
-                + "server B address: " + serverAAddress + "\n"
+                + "server B address: " + serverBAddress + "\n"
                 + "request analogy A " + filesANumberServer + "\n"
                 + "request analogy B " + filesBNumberServer + "\n"
                 + "server A port: " + portA + "\n"
