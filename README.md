@@ -72,10 +72,10 @@ The one without the original is the one with the dependencies.
 
 The following command will run the client based on the manifest specified inside the `pom.xml`.
 
-`java -jar target/TCP_METRICS-1.0-SNAPSHOT.jar serverA-ip serverB-ip number-of-files-A number-of-files-B`
+`java -jar client/target/CLIENT_TCP_METRICS-1.0-SNAPSHOT.jar serverA-ip serverB-ip number-of-files-A number-of-files-B`
 
 ### Run client without manifest file
 
 The following command will run the client without needing a manifest `pom.xml`.
 
-`java -cp targer/<jar-name>.jar StartClient serverA-ip serverB-ip number-of-files-A number-of-files-B`
+`java -cp client/target/<jar-name>.jar StartClient serverA-ip serverB-ip number-of-files-A number-of-files-B`
