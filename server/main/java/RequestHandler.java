@@ -3,6 +3,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -70,20 +71,35 @@ public class RequestHandler implements Runnable {
     @Override
     public void run() {
         log("Handling connection from: " + this.connection.getInetAddress());
-        try {
-            String string_json = dataInputStream.readUTF();
-            JSONObject json = new JSONObject(string_json);
-            JSONArray filenames = ((JSONArray) json.get("Filenames"));
-            String[] workable = parseToStringArray(filenames.toString());
-
-            Arrays.stream(workable)
-                    .forEach(filename -> {
-                        String path = "..\\files\\" + filename + this.file_extension;
-                        sendFile(path);
-                    });
-            log("Finished sending files to the client");
-        } catch (Exception e) {
-            log("Exception:" + e + "occured while receiving json object");
+        while (!this.connection.isClosed()) {
+            try {
+                String string_json = dataInputStream.readUTF();
+                JSONObject json = new JSONObject(string_json);
+                JSONArray filenames = ((JSONArray) json.get("Filenames"));
+                String[] workable = parseToStringArray(filenames.toString());
+                log("Length of workable is: " + workable.length);
+                // means its finished sending ALL the files
+                if (workable.length == 0) {
+                    this.connection.close();
+                    break;
+                }
+                this.dataOutputStream.writeInt(workable.length);
+                Arrays.stream(workable)
+                        .forEach(filename -> {
+                            String path = "..\\files\\" + filename + this.file_extension;
+                            sendFile(path);
+                        });
+                log("Finished sending files to the client");
+            } catch (Exception e) {
+                log("Exception:" + e + "occured while receiving requests and sending files");
+                try {
+                    this.connection.close();
+                } catch (IOException e1) {
+                    log("Couldn't close the connection: " + e1);
+                    e1.printStackTrace();
+                }
+                break;
+            }
         }
     }
 
