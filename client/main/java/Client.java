@@ -1,5 +1,7 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -23,10 +25,10 @@ import org.json.JSONObject;
 
 public class Client {
 
-    private ObjectOutputStream objectAOutputStream = null;
-    private ObjectInputStream objectAInputStream = null;
-    private ObjectOutputStream objectBOutputStream = null;
-    private ObjectInputStream objectBInputStream = null;
+    private DataOutputStream dataAOutputStream = null;
+    private DataInputStream dataAInputStream = null;
+    private DataOutputStream dataBOutputStream = null;
+    private DataInputStream dataBInputStream = null;
     private Socket clientASocket;
     private Socket clientBSocket;
 
@@ -144,10 +146,12 @@ public class Client {
         try {
             clientASocket = new Socket(serverAAddress, portA);
             clientBSocket = new Socket(serverBAddress, portB);
-            objectAOutputStream = new ObjectOutputStream(clientASocket.getOutputStream());
-            objectAInputStream = new ObjectInputStream(clientASocket.getInputStream());
-            objectBOutputStream = new ObjectOutputStream(clientBSocket.getOutputStream());
-            objectBInputStream = new ObjectInputStream(clientBSocket.getInputStream());
+            // read and send json objects
+            dataAOutputStream = new DataOutputStream(clientASocket.getOutputStream());
+            dataAInputStream = new DataInputStream(clientASocket.getInputStream());
+            dataBOutputStream = new DataOutputStream(clientBSocket.getOutputStream());
+            dataBInputStream = new DataInputStream(clientBSocket.getInputStream());
+
         } catch (Exception e) {
             log("Exception occured while trying to create client: " + e);
             return;
@@ -218,6 +222,43 @@ public class Client {
 
     }
 
+    private void receiveFile(DataInputStream dataInputStream, int files_expected) {
+        int counter = 0;
+        log("Files expected in receive file: " + files_expected + " and counter is initiliazed: " + counter);
+        while (true) {
+            try {
+                // receive filename from connection
+                String filename = dataInputStream.readUTF();
+                log("Read: " + filename + " filename from server");
+                // receive file size from connection
+                long filesize = dataInputStream.readLong();
+                log("Read: " + filesize + " filesize from server");
+                // create new file if it doesn't exist
+                File new_file = new File("..\\received_files\\" + filename);
+                new_file.createNewFile();
+                FileOutputStream fos = new FileOutputStream(new_file);
+                int bytes = 0;
+                byte[] buffer = new byte[4 * 1024];
+                while (filesize > 0
+                        && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, filesize))) != -1) {
+                    fos.write(buffer, 0, bytes);
+                    filesize -= bytes; // read upto file size
+                }
+                fos.close();
+            } catch (Exception e) {
+                log("Exception: " + e + " occured in receive file.");
+                break;
+            }
+            /*
+             * counter = counter + 1;
+             * log("Counter has become: " + counter);
+             * if (counter >= files_expected) {
+             * break;
+             * }
+             */
+        }
+    }
+
     /**
      * Starts requesting both servers for the files. It does this by creating two
      * callable tasks which are then called using invokeAll() to wait for their
@@ -241,7 +282,9 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverAAddress, portA, nextAfile, filesANumberServer,
                             "A");
 
-                    objectAOutputStream.writeObject(requestforJSON.toString());
+                    dataAOutputStream.writeUTF((requestforJSON.toString()));
+                    dataAOutputStream.flush();
+                    receiveFile(dataAInputStream, filesANumberServer);
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
@@ -273,7 +316,9 @@ public class Client {
                     JSONObject requestforJSON = createRequest(serverBAddress, portB, nextBfile, filesBNumberServer,
                             "B");
 
-                    objectBOutputStream.writeObject(requestforJSON.toString());
+                    dataBOutputStream.writeUTF((requestforJSON.toString()));
+                    dataBOutputStream.flush();
+                    receiveFile(dataBInputStream, filesBNumberServer);
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
