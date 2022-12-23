@@ -89,7 +89,7 @@ public class RequestHandler implements Runnable {
                 this.dataOutputStream.writeInt(workable.length);
                 Arrays.stream(workable)
                         .forEach(filename -> {
-                            String path = "files/" + filename + this.file_extension;
+                            String path = "..\\files\\" + filename + this.file_extension;
                             sendFile(path);
                         });
                 log("Finished sending files to the client");
