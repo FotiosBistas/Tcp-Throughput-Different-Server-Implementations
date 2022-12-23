@@ -2,6 +2,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -51,6 +52,8 @@ public class Client {
     private volatile int nextBfile = 1;
 
     ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
+
+    private final String directory_name = "..//received_files//";
 
     /**
      * Prints a log with a timestamp to the left of it.
@@ -222,10 +225,17 @@ public class Client {
 
     }
 
-    private void receiveFile(DataInputStream dataInputStream, int files_expected) {
+    private void receiveFile(Socket socket, DataInputStream dataInputStream) {
         int counter = 0;
+        int files_expected = 0;
+        try {
+            files_expected = dataInputStream.readInt();
+        } catch (IOException e1) {
+            log("Exception: " + e1 + "occured while receiving files expected");
+            return;
+        }
         log("Files expected in receive file: " + files_expected + " and counter is initiliazed: " + counter);
-        while (true) {
+        while (true && !socket.isClosed()) {
             try {
                 // receive filename from connection
                 String filename = dataInputStream.readUTF();
@@ -233,9 +243,17 @@ public class Client {
                 // receive file size from connection
                 long filesize = dataInputStream.readLong();
                 log("Read: " + filesize + " filesize from server");
+
+                // create the directory if it doesn't exist
+                File directory = new File(directory_name);
+                if (!directory.exists()) {
+                    directory.mkdir();
+                }
+
                 // create new file if it doesn't exist
-                File new_file = new File("..\\received_files\\" + filename);
+                File new_file = new File(directory_name + "//" + filename);
                 new_file.createNewFile();
+
                 FileOutputStream fos = new FileOutputStream(new_file);
                 int bytes = 0;
                 byte[] buffer = new byte[4 * 1024];
@@ -243,19 +261,20 @@ public class Client {
                         && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, filesize))) != -1) {
                     fos.write(buffer, 0, bytes);
                     filesize -= bytes; // read upto file size
+
                 }
+                log("Finished receiving file");
                 fos.close();
             } catch (Exception e) {
                 log("Exception: " + e + " occured in receive file.");
                 break;
             }
-            /*
-             * counter = counter + 1;
-             * log("Counter has become: " + counter);
-             * if (counter >= files_expected) {
-             * break;
-             * }
-             */
+            counter++;
+            log("Counter has become: " + counter + " and files expected are: " + files_expected);
+            if (counter >= files_expected) {
+                log("Breaking from receiving file while loop");
+                break;
+            }
         }
     }
 
@@ -284,7 +303,8 @@ public class Client {
 
                     dataAOutputStream.writeUTF((requestforJSON.toString()));
                     dataAOutputStream.flush();
-                    receiveFile(dataAInputStream, filesANumberServer);
+                    receiveFile(clientASocket, dataAInputStream);
+                    log("Exited receive File from server A");
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
@@ -296,6 +316,7 @@ public class Client {
                     String[] array = (String[]) requestforJSON.get("Filenames");
                     if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
                         log("Breaking from for A loop");
+                        clientASocket.close();
                         break;
                     }
 
@@ -318,7 +339,8 @@ public class Client {
 
                     dataBOutputStream.writeUTF((requestforJSON.toString()));
                     dataBOutputStream.flush();
-                    receiveFile(dataBInputStream, filesBNumberServer);
+                    receiveFile(clientBSocket, dataBInputStream);
+                    log("Exited receive File from server B");
                     long endTime = System.nanoTime(); // get the end time in nanoseconds
                     long elapsedTime = endTime - startTime; // calculate the elapsed time in nanoseconds
                     log("It took: " + elapsedTime + " nanoseconds to complete the request");
@@ -330,6 +352,7 @@ public class Client {
                     String[] array = (String[]) requestforJSON.get("Filenames");
                     if (Arrays.asList(array).contains("Out of range number was given or there aren't any more files")) {
                         log("Breaking from B for loop");
+                        clientBSocket.close();
                         break;
                     }
 
