@@ -185,3 +185,7 @@ Already up to date.
 `cd server`
 
 `java -jar target/SERVER_TCP_METRICS-1.0-SNAPSHOT.jar serverIP port(optional)`
+
+## Android APK
+
+https://mega.nz/file/b0tkBajD#7KNbGdR3sEj1rXT_gJGj6x9cJhlkZa1R85K0XZi8LW4
